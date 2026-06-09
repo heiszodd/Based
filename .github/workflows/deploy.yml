@@ -1,0 +1,36 @@
+name: Deploy Poke Token to Base
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'contracts/**'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Deploy to Base
+        working-directory: ./contracts
+        run: |
+          forge script script/DeployPoke.s.sol \
+            --rpc-url ${{ secrets.RPC_URL }} \
+            --private-key ${{ secrets.PRIVATE_KEY }} \
+            --broadcast \
+            --verify \
+            --etherscan-api-key ${{ secrets.ETHERSCAN_API_KEY }}
+        env:
+          RPC_URL: ${{ secrets.RPC_URL }}
+          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
