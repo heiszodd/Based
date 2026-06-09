@@ -22,14 +22,16 @@ jobs:
       - name: Install OpenZeppelin
         run: |
           cd contracts
-          if [ ! -d "lib/openzeppelin-contracts" ]; then
-            forge install openzeppelin/openzeppelin-contracts --no-commit
-          fi
+          # Force installation of OpenZeppelin and ignore existing files
+          forge install openzeppelin/openzeppelin-contracts --no-commit
 
       - name: Deploy to Base
         run: |
           cd contracts
-          forge script script/DeployPoke.s.sol --rpc-url ${{ secrets.RPC_URL }} --broadcast --verify
+          # Use --legacy if the RPC/Network has issues with EIP-1559 (Base sometimes does)
+          # Also use --skip-simulation if the burner has $0 for the check but will be funded
+          # Adding --legacy as a common fix for gas-estimation failures on L2s
+          forge script script/DeployPoke.s.sol --rpc-url ${{ secrets.RPC_URL }} --broadcast --legacy --verify
         env:
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
           ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
