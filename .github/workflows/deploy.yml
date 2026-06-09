@@ -1,36 +1,35 @@
-name: Deploy Poke Token to Base
+name: Deploy Poke Token
 
 on:
   push:
-    branches:
-      - main
     paths:
       - 'contracts/**'
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
-        with:
-          version: nightly
+
+      - name: Install OpenZeppelin
+        run: |
+          cd contracts
+          if [ ! -d "lib/openzeppelin-contracts" ]; then
+            forge install openzeppelin/openzeppelin-contracts --no-commit
+          fi
 
       - name: Deploy to Base
-        working-directory: ./contracts
         run: |
-          forge script script/DeployPoke.s.sol \
-            --rpc-url ${{ secrets.RPC_URL }} \
-            --private-key ${{ secrets.PRIVATE_KEY }} \
-            --broadcast \
-            --verify \
-            --etherscan-api-key ${{ secrets.ETHERSCAN_API_KEY }}
+          cd contracts
+          forge script script/DeployPoke.s.sol --rpc-url ${{ secrets.RPC_URL }} --broadcast --verify
         env:
-          RPC_URL: ${{ secrets.RPC_URL }}
           PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
