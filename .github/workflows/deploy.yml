@@ -11,6 +11,8 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,39 +25,53 @@ jobs:
         run: |
           cd contracts
           mkdir -p lib
-          # Force install OZ if not present
-          if [ ! -d "lib/openzeppelin-contracts" ]; then
-            git init
-            forge install openzeppelin/openzeppelin-contracts --no-commit
-          fi
+          # Forge install requires a git repo context
+          git init
+          forge install openzeppelin/openzeppelin-contracts --no-commit || true
 
       - name: Debug Environment
         run: |
           cd contracts
-          echo "Checking files..."
-          ls -R lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol || echo "OZ NOT FOUND"
-          echo "Checking Private Key Length..."
-          if [ -z "${{ secrets.PRIVATE_KEY }}" ]; then
-            echo "PRIVATE_KEY IS EMPTY"
+          echo "Checking library files..."
+          if [ -d "lib/openzeppelin-contracts" ]; then
+            echo "OZ library directory exists."
           else
-            echo "PRIVATE_KEY is set (length: ${#PRIVATE_KEY})"
+            echo "OZ library directory MISSING."
+          fi
+          
+          echo "Checking Private Key configuration..."
+          # We check length without printing the key
+          PK_VAL="${{ secrets.PRIVATE_KEY }}"
+          if [ -z "$PK_VAL" ]; then
+            echo "ERROR: PRIVATE_KEY secret is not set in GitHub Secrets."
+          else
+            echo "PRIVATE_KEY is present (Length: ${#PK_VAL} characters)."
           fi
 
       - name: Deploy to Base
         run: |
           cd contracts
-          RPC="${{ secrets.RPC_URL }}"
-          if [ -z "$RPC" ]; then
-            RPC="https://mainnet.base.org"
+          
+          # Fallback to public RPC if secret is missing
+          RPC_URL="${{ secrets.RPC_URL }}"
+          if [ -z "$RPC_URL" ]; then
+            RPC_URL="https://mainnet.base.org"
           fi
           
-          # We use --broadcast and --private-key directly for maximum clarity
-          # We use --legacy for Base EIP-1559 compatibility
+          echo "Starting deployment to Base via $RPC_URL..."
+          
+          # Standardizing the deployment command for Base L2
+          # 1. --legacy: Often required for L2s that don't support EIP-1559 perfectly
+          # 2. --slow: Ensures transaction propagation
+          # 3. --skip-simulation: Prevents local estimation errors from blocking the broadcast
+          # 4. --chain-id 8453: Explicitly targets Base Mainnet
+          
           forge script script/DeployPoke.s.sol \
-            --rpc-url "$RPC" \
+            --rpc-url "$RPC_URL" \
             --private-key "${{ secrets.PRIVATE_KEY }}" \
             --broadcast \
             --legacy \
             --slow \
             --skip-simulation \
+            --chain-id 8453 \
             -vvvv
