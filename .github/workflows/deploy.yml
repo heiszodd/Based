@@ -22,28 +22,40 @@ jobs:
       - name: Install OpenZeppelin
         run: |
           cd contracts
-          # Initialize as git repo if needed for forge install
-          git init
-          forge install openzeppelin/openzeppelin-contracts --no-commit || true
+          mkdir -p lib
+          # Force install OZ if not present
+          if [ ! -d "lib/openzeppelin-contracts" ]; then
+            git init
+            forge install openzeppelin/openzeppelin-contracts --no-commit
+          fi
+
+      - name: Debug Environment
+        run: |
+          cd contracts
+          echo "Checking files..."
+          ls -R lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol || echo "OZ NOT FOUND"
+          echo "Checking Private Key Length..."
+          if [ -z "${{ secrets.PRIVATE_KEY }}" ]; then
+            echo "PRIVATE_KEY IS EMPTY"
+          else
+            echo "PRIVATE_KEY is set (length: ${#PRIVATE_KEY})"
+          fi
 
       - name: Deploy to Base
         run: |
           cd contracts
-          # Use public RPC if secret is missing
           RPC="${{ secrets.RPC_URL }}"
           if [ -z "$RPC" ]; then
             RPC="https://mainnet.base.org"
           fi
           
-          echo "Deploying to Base via $RPC..."
-          
-          # Added --legacy for L2 gas compatibility and --slow for reliable broadcast
-          # Using --skip-simulation if it still fails due to gas estimation
+          # We use --broadcast and --private-key directly for maximum clarity
+          # We use --legacy for Base EIP-1559 compatibility
           forge script script/DeployPoke.s.sol \
             --rpc-url "$RPC" \
+            --private-key "${{ secrets.PRIVATE_KEY }}" \
             --broadcast \
             --legacy \
             --slow \
-            --skip-simulation
-        env:
-          PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+            --skip-simulation \
+            -vvvv
